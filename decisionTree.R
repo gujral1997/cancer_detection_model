@@ -27,8 +27,8 @@
 # Step 0: Start; Getting the starting time
 #--------------------------------------------------------------
 cat("\nSTART\n")
-startTime = proc.time()[3]
-startTime
+#startTime = proc.time()[3]
+#startTime
 
 
 
@@ -36,7 +36,7 @@ startTime
 # Step 1: Include Library
 #--------------------------------------------------------------
 cat("\nStep 1: Library Inclusion")
-library(rpart)
+library(nnet)
 library(hmeasure)
 
 
@@ -48,10 +48,10 @@ cat("\nStep 2: Variable Declaration")
 modelName <- "decisionTree"
 modelName
 
-InputDataFileName="brestCancer.csv"
+InputDataFileName="numerai_training_data.csv"
 InputDataFileName
 
-training = 50      # Defining Training Percentage; Testing = 100 - Training
+training = 100      # Defining Training Percentage; Testing = 100 - Training
 
 
 
@@ -75,13 +75,14 @@ cat("\nStep 4: Counting dataset")
 totalDataset <- nrow(dataset)
 totalDataset
 
+dataset <- dataset[,grep("feature|target",names(dataset))]
 
 
 #--------------------------------------------------------------
 # Step 5: Choose Target variable
 #--------------------------------------------------------------
 cat("\nStep 5: Choose Target Variable")
-target  <- names(dataset)[10]   # i.e. Cancer
+target  <- names(dataset)[51]   # i.e. Cancer
 target
 
 
@@ -108,15 +109,70 @@ trainDataset <- dataset[1:(totalDataset * training/100),c(inputs, target)]
 head(trainDataset)    # Show Top 6 records
 nrow(trainDataset)    # Show number of train Dataset
 
+####################################################################################################################################################################
+
+cat("\nStep 2: Variable Declaration")
+
+InputDataFileName2="numerai_tournament_data.csv"
+InputDataFileName2
+
+
+
+
+#--------------------------------------------------------------
+# Step 3: Data Loading
+#--------------------------------------------------------------
+cat("\nStep 3: Data Loading")
+dataset2 <- read.csv(InputDataFileName2)      # Read the datafile
+dataset2 <- dataset[sample(nrow(dataset2)),]  # Shuffle the data row wise.
+
+head(dataset2)   # Show Top 6 records
+nrow(dataset2)   # Show number of records
+names(dataset2)  # Show fields names or columns names
+
+
+
+#--------------------------------------------------------------
+# Step 4: Count total number of observations/rows.
+#--------------------------------------------------------------
+cat("\nStep 4: Counting dataset")
+totalDataset2 <- nrow(dataset2)
+totalDataset2
+
+dataset2 <- dataset2[,grep("feature|target",names(dataset2))]
+
+
+#--------------------------------------------------------------
+# Step 5: Choose Target variable
+#--------------------------------------------------------------
+cat("\nStep 5: Choose Target Variable")
+target2  <- names(dataset2)[51]   # i.e. Cancer
+target2
+
+
+
+#--------------------------------------------------------------
+# Step 6: Choose inputs Variables
+#--------------------------------------------------------------
+cat("\nStep 6: Choose Inputs Variable")
+inputs2 <- setdiff(names(dataset2),target2)
+inputs2
+length(inputs2)
+
+#Feature Selection
+#n=4
+#inputs <-sample(inputs, n)
+
+################################################################################################################################################
 
 
 #--------------------------------------------------------------
 # Step 8: Select Testing Data Set
 #--------------------------------------------------------------
 cat("\nStep 8: Select testing dataset")
-testDataset <- dataset[(totalDataset * training/100):totalDataset,c(inputs, target)]
-head(testDataset)
-nrow(testDataset)
+testDataset2 <- dataset2[,c(inputs2, target2)]
+head(testDataset2)
+nrow(testDataset2)
 
 
 
@@ -125,10 +181,10 @@ nrow(testDataset)
 # Step 9: Model Building (Training)
 #--------------------------------------------------------------
 cat("\nStep 9: Model Building -> ", modelName)
-formula <- as.formula(paste(target, "~", paste(c(inputs), collapse = "+")))
+formula <- as.formula(paste(target, "~", paste(c(inputs2), collapse = "+")))
 formula
 
-model   <- rpart(formula, trainDataset, method="class", parms=list(split="information"), control=rpart.control(usesurrogate=0, maxsurrogate=0))
+model   <- nnet(formula, trainDataset,size = 10, linout = TRUE, skip = TRUE, MaxNwts = 10000, trace = FALSE, maxit = 100)
 model
 
 
@@ -136,9 +192,9 @@ model
 # Step 10: Prediction (Testing)
 #--------------------------------------------------------------
 cat("\nStep 10: Prediction using -> ", modelName)
-Predicted <- predict(model, testDataset, type="class")
+Predicted <- as.numeric(round(predict(model, testDataset2)))
 head(Predicted)
-PredictedProb <- predict(model, testDataset, type="prob")[,1]
+PredictedProb <- predict(model, testDataset2)
 head(PredictedProb)
 
 
@@ -146,7 +202,7 @@ head(PredictedProb)
 # Step 11: Extracting Actual
 #--------------------------------------------------------------
 cat("\nStep 11: Extracting Actual")
-Actual <- as.double(unlist(testDataset[target]))
+Actual <- as.double(unlist(testDataset2[target]))
 head(Actual)
 
 
@@ -163,8 +219,8 @@ ConfusionMatrix
 
 # Step 12.2: Evaluations Parameters
 # AUC, ERR, Sen, Spec, Pre,Recall, TPR, FPR, etc 
-EvaluationsParameters <- round(HMeasure(Actual,PredictedProb)$metrics,3)
-EvaluationsParameters
+#EvaluationsParameters <- round(HMeasure(Actual,PredictedProb)$metrics,3)
+#EvaluationsParameters
 
 
 # Step 12.3: Accuracy
@@ -173,8 +229,8 @@ accuracy
 
 
 # Step 12.4: Total Time
-totalTime = proc.time()[3] - startTime
-totalTime
+#totalTime = proc.time()[3] - startTime
+#totalTime
 
 
 
@@ -215,6 +271,9 @@ cat("\nStep 13: Writing to file")
 
 # Step 13.1: Writing to file (evaluation result)
 write.csv(EvaluationsParameters, file=paste(modelName,"-Evaluation-Result.csv",sep=''), row.names=TRUE)
+
+
+
 
 # Step 13.2: Writing to file (Actual and Predicted)
 write.csv(data.frame(Actual,Predicted), file=paste(modelName,"-ActualPredicted-Result.csv",sep=''), row.names=FALSE)
